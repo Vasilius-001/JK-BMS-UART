@@ -36,8 +36,5 @@
 ## Параметры загрузки в Arduino IDE
 
 ## Скриншоты
-![PROJECT_PHOTO]()
-![PROJECT_PHOTO]()
-![PROJECT_PHOTO]()
-![PROJECT_PHOTO]()
-![PROJECT_PHOTO]()
+![PROJECT_PHOTO](https://github.com/Vasilius-001/JK-BMS-UART/blob/main/docs/JK_BMS_1.jpg)
+![PROJECT_PHOTO](https://github.com/Vasilius-001/JK-BMS-UART/blob/main/docs/JK_BMS_2.jpg)
