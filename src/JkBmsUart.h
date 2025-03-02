@@ -29,6 +29,7 @@ struct BMSConfig {
     bool modeHex = false;                      // Логирование полученного пакета: true-выводить, false-не выводить
     bool modeNum = false;                      // Нумерация запросов: выключена
     HardwareSerial &uart = Serial1;            // Аппаратный UART для общения с BMS
+    uint16_t speedUart = 11520;                // Скорость передачи UART
     uint16_t rxBufferSize = 64;                // Размер буфера приема UART
     unsigned long timeoutMs = 10;              // Таймаут приема (мс)
     bool modeFastCorrect = true;               // Ускоренная коррекция количества ячеек
