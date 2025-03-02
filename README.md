@@ -1,4 +1,4 @@
-# JK-BMS-UART
+# JK BMS UART
 Библиотека для работы с JK BMS через UART по протоколу 4G-GPS / Library for working with JK BMS via UART using 4G-GPS protocol
 ## Описание проекта
 **JK_BMS_UART** библиотека для Arduino IDE и ей подобных. Позволяет обмениваться данными с JK BMS через UART GPS по протоколу 4G-GPS.
