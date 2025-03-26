@@ -42,8 +42,8 @@
 #include <JkBmsUart.h>
 
 void setup() {
-   Serial.begin(bmsSet.speedUartLoger); // Аппаратный UART для информационных сообщений
-	bmsSet.uart.begin(bmsSet.speedUartBms); // Аппаратный UART для общения с BMS
+    Serial.begin(bmsSet.speedUartLoger); // Аппаратный UART для информационных сообщений
+    bmsSet.uart.begin(bmsSet.speedUartBms); // Аппаратный UART для общения с BMS
 }
 
 void loop() {
