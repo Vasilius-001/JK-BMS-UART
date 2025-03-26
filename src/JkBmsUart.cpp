@@ -20,6 +20,7 @@ uint16_t bmsCellVoltages[MAX_CELL_COUNT] = {0};        // Массив напр�
 BMSConfig bmsSet;              // Определяем экземпляр структуры BMSConfig
 BMSData bmsData;               // Определяем экземпляр структуры BMSData
 StatusFlags bmsStatus;         // Определяем экземпляр структуры StatusFlags
+
 #ifndef DISABLE_PARSE_OX8B
 ProtectionFlags bmsProtection; // Определяем экземпляр структуры ProtectionFlags
 #endif
@@ -35,15 +36,14 @@ BMSCommands bmsCommands = { // Определяем экземпляр стру�
 };
 
 uint8_t *readAll = bmsCommands.readAllRegisters;       // Определяем указатель на команду readAll
-uint8_t *onCharg = bmsCommands.enableCharging;         // Определяем указатель на команду onCharg
-uint8_t *offCharg = bmsCommands.disableCharging;       // Определяем указатель на команду offCharg
-uint8_t *onDischarg = bmsCommands.enableDischarging;   // Определяем указатель на команду onDischarg
-uint8_t *offDischarg = bmsCommands.disableDischarging; // Определяем указатель на команду offDischarg
-uint8_t *onBalance = bmsCommands.enableBalancer;       // Определяем указатель на команду onBalance
-uint8_t *offBalance = bmsCommands.disableBalancer;     // Определяем указатель на команду offBalance
+uint8_t *onCharge = bmsCommands.enableCharging;         // Определяем указатель на команду onCharge
+uint8_t *offCharge = bmsCommands.disableCharging;       // Определяем указатель на команду offCharge
+uint8_t *onDischarge = bmsCommands.enableDischarging;   // Определяем указатель на команду onDischarge
+uint8_t *offDischarge = bmsCommands.disableDischarging; // Определяем указатель на команду offDischarge
+uint8_t *onBalancer = bmsCommands.enableBalancer;       // Определяем указатель на команду onBalancer
+uint8_t *offBalancer = bmsCommands.disableBalancer;     // Определяем указатель на команду offBalancer
 
-
-
+#ifdef LOG_OUT
 #ifndef DISABLE_PARSE_OX8C
 #ifndef DISABLE_OUTPUT_LOG_OX8B
 /* Массивы строковых сообщений структуры ProtectionFlags*/
@@ -113,7 +113,7 @@ const char *bmsStatusMessagesEN[] = {
     "On"
 };
 extern const char *bmsStatusMessagesEN[];
-
+#endif
 
 /* Предварительное объявление `static`-функций (если используется раньше в коде) */
 static bms_error_t bmsParseAllData(uint8_t *data);
@@ -121,15 +121,68 @@ static bms_error_t convertTemperature(uint16_t rawTemp, int8_t &temperature);
 static bms_error_t clearRxBuffer();
 static bms_error_t checkAnswer(uint8_t *dataAnswer, uint16_t length);
 static bms_error_t calculateChecksum16(uint8_t *data, uint16_t length);
-static bms_error_t printHexAnswer(uint8_t *dataPacket, uint16_t length);
 static uint16_t calculationAnswerPacketSize();
 static bms_error_t resetAnswerArray(uint8_t *dataAnswer, uint16_t length);
-static void printMessage(const char* messageRU, const char* messageEN);
-static void printlnMessage(const char* messageRU, const char* messageEN);
 static void printErrorPointer();
 static void logTimeoutErrorNoConnection();
 static bms_error_t logErrorPacket(uint8_t *dataAnswer, uint16_t length);
+#ifdef LOG_OUT
+static bms_error_t printHexAnswer(uint8_t *dataPacket, uint16_t length);
+static void printMessage(const char* messageRU, const char* messageEN);
+static void printlnMessage(const char* messageRU, const char* messageEN);
+#endif
 
+/*---------------------------------------------
+		Функции
+---------------------------------------------*/
+
+/*
+* @brief Функция обновления настроек конфигурации
+*
+* @param lang             Язык вывода логов "RU"-русский, "EN"-английский
+* @param log              Логирование "NO"-без логов, "ALL"-выводить все, "ERROR"-только ошибки
+* @param hex              Логирование полученного пакета: true-выводить, false-не выводить
+* @param num              Нумерация запросов: true-включена, false-отключена
+* @param uartPort         Аппаратный UART для общения с BMS
+* @param speedBms         Скорость общения UART с BMS
+* @param speedLog         Скорость порта для логирования
+* @param buffer           Размер буфера приема UART
+* @param timeout          Таймаут приема (мс)
+* @param fastCorrect      Ускоренная коррекция количества ячеек: true-включена, false-отключена
+* @param correction       Количество итераций коррекции
+* @param errorLimit       Ограничение по количеству ошибочных пакетов: true-включено, false-отключено
+* @param numberError      Количество ошибочных циклов
+* @param limitError       Лимит ошибок до прекрашения отправки запросов
+* @param cyclePollingMs   Время опроса ошибочных циклов, мс
+* @param requestInterval  Интервал запроса чтения всех регистров
+* @param commandInterval  Интервал отправки команды, не чаще 100 мс
+*
+* @return void
+*/
+void bmsUpdateConfig(BmsLanguage lang, BmsModeLog log, bool hex, bool num,
+	HardwareSerial &uartPort, uint32_t speedBms, uint32_t speedLog,
+	uint16_t buffer, unsigned long timeout, bool fastCorrect,
+	uint8_t correction, bool errorLimit, uint8_t numberError,
+	uint16_t limitError, unsigned long cyclePollingMs,
+	unsigned long requestInterval, unsigned long commandInterval) {
+bmsSet.language = lang;                    
+bmsSet.modeLog = log;                 	
+bmsSet.modeHex = hex;                     	
+bmsSet.modeNum = num;                     	
+bmsSet.uart = uartPort;           	
+bmsSet.speedUartBms = speedBms;           	
+bmsSet.speedUartLoger = speedLog;         	
+bmsSet.rxBufferSize = buffer;              	
+bmsSet.timeoutMs = timeout;             	
+bmsSet.modeFastCorrect = fastCorrect;              	
+bmsSet.correctIterations = correction;            	
+bmsSet.modeErrorLimit = errorLimit;               	
+bmsSet.numberErrorCycles = numberError;           	
+bmsSet.limitErrorCycles = limitError;           	
+bmsSet.errorCyclePollingMs = cyclePollingMs;	
+bmsSet.readRequestInterval = requestInterval; 	
+bmsSet.sendCommandInterval = commandInterval;  	
+}
 
 /*
 * @brief Функция отправки и приема
@@ -149,10 +202,12 @@ bms_error_t bmsSendRecive(uint8_t *message) {
 
 	if (bmsSet.modeErrorLimit && bmsSet.numberErrorCycles > 0) {
 		if (numberErrorConnect >= bmsSet.limitErrorCycles) {
+#ifdef LOG_OUT
 			if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 				printlnMessage("❌ Достигнут лимит ошибок, прекращаем отправку запросов", 
 							   "❌ Limit of errors reached, stopping requests");
 			}
+#endif
 			return ERROR_LIMIT_CYCLES;  // Останавливаем запросы
 		}
 	
@@ -174,19 +229,23 @@ bms_error_t bmsSendRecive(uint8_t *message) {
     bms_error_t receiveResult = bmsReceiveAnswer();
 
     // Обработка ошибки ERROR_CONNECT и ERROR_DATA
+	if (receiveResult == ERROR_CONNECT) {
+
+		// Выставляем флаг состояния на ошибку
+		bmsStatus.connectState = false;
+	}
     if (receiveResult == ERROR_CONNECT || receiveResult == ERROR_DATA) {
         numberErrorConnect++; // Увеличиваем количество ошибок
 
-        // Выставляем флаги состояния на ошибку
+        // Выставляем флаг состояния на ошибку
         bmsStatus.dataState = false;
-        bmsStatus.connectState = false;
-
+#ifdef LOG_OUT
         // Логируем ошибку
         if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
             printMessage("❌ Ошибка при получении данных: ", "❌ Error receiving data: ");
             Serial.println(receiveResult == ERROR_CONNECT ? "ERROR_CONNECT" : "ERROR_DATA");
         }
-
+#endif
         return receiveResult;  // Возвращаем ошибку
     }
 
@@ -204,11 +263,11 @@ bms_error_t bmsSendRecive(uint8_t *message) {
         bmsStatus.dataState = true;
         bmsStatus.connectState = true;
         numberErrorConnect = 0; // Сбрасываем количество ошибок
-
+#ifdef LOG_OUT
         if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
             printlnMessage("✅ Данные успешно получены!", "✅ Data received successfully!");
         }
-
+#endif
         return SUCCESS;  // Успешно завершено
     }
 
@@ -237,11 +296,13 @@ bms_error_t bmsSendMessage(uint8_t *message) {
 	stateRegisterBms = message[12]; // Сохраняем состояние регистра в запросе
 	}
 	if (bmsCommandSendMessage != 0x06 && bmsCommandSendMessage != 0x02) {
+#ifdef LOG_OUT
 		Serial.println("");
 		printMessage("❓ Неизвестная команда BMS = ", "❓ Unknown BMS command = ");
 		Serial.print("0x0");
 		Serial.println(bmsCommandSendMessage, HEX);
 		Serial.println("");
+#endif
 		return ERROR_COMMAND;
 	}
 	/* Вставляем в запрос его номер */
@@ -258,7 +319,7 @@ bms_error_t bmsSendMessage(uint8_t *message) {
 	/* Добавляем контрольную сумму */
     bmsSet.uart.write(calculatedChecksum >> 8);
     bmsSet.uart.write(calculatedChecksum & 0xFF);
-
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 		if (bmsCommandSendMessage == 0x06) {
 			Serial.println("");
@@ -272,6 +333,7 @@ bms_error_t bmsSendMessage(uint8_t *message) {
 		Serial.println(bmsCommandSendMessage, HEX);
 		Serial.println("");
 	}
+#endif
 	return SUCCESS;
 }
 
@@ -294,11 +356,13 @@ bms_error_t bmsReceiveAnswer() {
 	} else if (bmsCommandSendMessage == 0x06) {
 		packetSize = bmsData.answerPacketSize;
 		} else {
+#ifdef LOG_OUT
 			Serial.println("");
 			printMessage("❓ Неизвестная команда BMS = ", "❓ Unknown BMS command = ");
 			Serial.print("0x0");
 			Serial.println(bmsCommandSendMessage, HEX);
 			Serial.println("");
+#endif
 			return ERROR_COMMAND;
 		}
 
@@ -337,15 +401,19 @@ bms_error_t bmsReceiveAnswer() {
 					}
 					if (bmsCommandSendMessage == 0x06) {
 						logErrorPacket(generalAnswer, indexAnswer);
+#ifdef LOG_OUT
 						if (bmsSet.modeLog == ERROR) {
 							printMessage("🔋 Количество указанных ячеек: ", "🔋 Number of specified cells: ");
 							Serial.println(bmsData.specifiedCellCount);
 						}
+#endif
 						if (bmsData.specifiedCellCount != MAX_CELL_COUNT) {
+#ifdef LOG_OUT
 							if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 								printMessage("🔹 Задаем максимальное количество ячеек = ", "🔹 Set the maximum number of cells = ");
 								Serial.println(MAX_CELL_COUNT);
 							}
+#endif
 							bmsData.specifiedCellCount = MAX_CELL_COUNT; // Задаем максимальное количество ячеек
 							bmsData.answerPacketSize = calculationAnswerPacketSize(); // Рассчитываем размер пакета данных ответа
 						}
@@ -357,6 +425,7 @@ bms_error_t bmsReceiveAnswer() {
 					/* Проверяем ID регистра  */
 					uint8_t answerRegisterBms = toggleAnswer[11]; // Сохранем ID регистра ответа для дальнейшей проверки
 					if (requestRegisterBms == answerRegisterBms) {
+#ifdef LOG_OUT
 						if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 							printlnMessage("✅ Регистр изменен успешно!", "✅ Register changed successfully!");
 							uint8_t msgIndex = (answerRegisterBms == 0xAB) ? 0 : 
@@ -367,10 +436,13 @@ bms_error_t bmsReceiveAnswer() {
 								printlnMessage(bmsStatusMessagesRU[stateRegisterBms], bmsStatusMessagesEN[stateRegisterBms]);
 							}
 						}
+#endif
 						resetAnswerArray(toggleAnswer, BMS_TOGGLE_ANSWER_SIZE); // Сбрасываем массив приема и обнуляем его индекс
 						return SUCCESS; // Выход по завершению разбора принятого пакета
 					}
+#ifdef LOG_OUT
 					printlnMessage("❓ Неизвестный ID регистра !", "❓ Unknown registry ID!");
+#endif
 					return ERROR_DATA;
 				}
 				if (bmsCommandSendMessage == 0x06) {
@@ -388,22 +460,26 @@ bms_error_t bmsReceiveAnswer() {
 		return ERROR_CONNECT;  // Выход по таймауту из-за отсутсвия связи
 	}
 	if (bmsCommandSendMessage == 0x06) { 
+#ifdef LOG_OUT
 	/* Выводим сообщение в лог */
 		if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 			printMessage("🔹 Ожидалось байт: ", "🔹 Expected bytes: ");
 			Serial.println(bmsData.answerPacketSize);
 			printMessage("🔋 Количество указанных ячеек: ", "🔋 Number of specified cells: "); Serial.println(bmsData.specifiedCellCount);
 		}
+#endif
 		/* Если количество принятых данных не 0 выводим сообщение в лог и пробуем парсить принятый пакет */
 		if (bmsParseAllData(generalAnswer) == SUCCESS) {
 			bmsData.specifiedCellCount = bmsData.receivedCellCount; // Задаем количество ячеек полученных в пакете ответа
 			bmsData.answerPacketSize = calculationAnswerPacketSize(); // Рассчитываем размер пакета данных ответа
+#ifdef LOG_OUT
 			if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 				printlnMessage("❗ Пакет разобран частично!", "❗ The package is partially disassembled!");
 				printMessage("🔹 Указываем количество ячеек из пакета = ", "🔹 Specify the number of cells from the package = ");
 				Serial.println(bmsData.receivedCellCount);
 				Serial.println("");
 			}
+#endif
 		}
 	}
 	bmsData.countError++; // Увеличиваем счетчик ошибок
@@ -440,18 +516,21 @@ bms_error_t bmsCorrectionCycle() {
 
         bms_error_t receiveStatus = bmsReceiveAnswer(); // Принимаем пакет ответа от BMS
         if (receiveStatus == SUCCESS) {
+#ifdef LOG_OUT
             if (bmsSet.modeLog == ALL) {
                 printlnMessage("✅ Количество ячеек изменено успешно!", "✅ Number of cells changed successfully!");
                 printMessage("🔹 Количество итераций: ", "🔹 Number of iterations: ");
                 Serial.println(iteration);
             }
+#endif
             return SUCCESS; // Выход при успешной коррекции
         }
     }
-
+#ifdef LOG_OUT
     if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
         printlnMessage("❌ Ошибка: не удалось изменить количество ячеек!", "❌ Error: Failed to change the number of cells!");
     }
+#endif
     return ERROR_CORRECTION;  // Возвращаем таймаут, если коррекция не удалась
 }
 
@@ -470,20 +549,22 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
         printErrorPointer();
         return ERROR_POINTER;
     }
-	
+#ifdef LOG_OUT	
 	/* Вывод в отладочный порт полученного пакета */
 	if (bmsSet.modeHex) {
 		if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 		    printlnMessage("   🔍 Получены данные:", "   🔍 Data received:");
             printHexAnswer(generalAnswer, packetLength + 2);
 		}
-	}	
+	}
+#endif	
 	
 	/* Парсим данные напряжения ячеек регитсра 0x79 */
     uint16_t indexParse = START_BLOCK_LENGTH; // Смещение на начало блока регистра напряжений ячеек	
     if (data[indexParse] == 0x79) {
         cellDataLength = data[indexParse + 1];
-        bmsData.receivedCellCount = cellDataLength / 3;		
+        bmsData.receivedCellCount = cellDataLength / 3;	
+#ifdef LOG_OUT	
 		/* Проверка корректности указаного количества ячеек */
 		if (bmsData.receivedCellCount != bmsData.specifiedCellCount) {
 			if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
@@ -492,16 +573,19 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 			    printMessage(", но получено ", ", but received ");
 			    Serial.println(bmsData.receivedCellCount);
 			}
-		}		
+		}
+#endif		
 		/* Нахождение максимального и минимального напряжения на ячейках */
 		bmsData.minCellVoltage = UINT16_MAX;
         bmsData.maxCellVoltage = 0;
         for (uint8_t i = 0; i < bmsData.receivedCellCount; i++) {
             uint8_t cellIndex = data[indexParse + 2 + (i * 3)];			
 			if (cellIndex == 0 || cellIndex > bmsData.specifiedCellCount) {
+#ifdef LOG_OUT
 				if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 			        printlnMessage("❌ Ошибка: Неверный индекс ячейки!", "❌ Error: Invalid cell index!");
 				}
+#endif
 			    return ERROR_DATA;
 		    }
             uint16_t cellVoltage = (data[indexParse + 3 + (i * 3)] << 8) | data[indexParse + 4 + (i * 3)];
@@ -513,6 +597,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
                 bmsData.maxCellVoltage = bmsCellVoltages[cellIndex - 1];
             }
         }
+#ifdef LOG_OUT
 		/* Вывод в порт отладочной информации */
 		if (bmsSet.modeLog == ALL) {
 		    printMessage("🔋 Количество ячеек: ", "🔋 Number of cells: "); Serial.println(bmsData.receivedCellCount);
@@ -521,17 +606,25 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 			printMessage("🔋 Минимальное напряжение ячейки: ", "🔋 Minimum cell voltage: ");
             Serial.printf("%0.3f", (float)bmsData.minCellVoltage / 1000); printlnMessage(" В", " V");
 		}
+#endif
     }
 		
 	/* Парсинг регистров 0x80, 0x81, 0x82, 0x83, 0x84, 0x85 */
 	indexParse += cellDataLength + 2; // Смещение на начало блока регистров
 	if (data[indexParse] == 0x80) {
+#ifdef LOG_OUT		
         bms_error_t tempError1 = convertTemperature((data[indexParse + 1] << 8) | data[indexParse + 2], bmsData.mosfetTemp);
 		bms_error_t tempError2 = convertTemperature((data[indexParse + 4] << 8) | data[indexParse + 5], bmsData.batteryTemp1);
 		bms_error_t tempError3 = convertTemperature((data[indexParse + 7] << 8) | data[indexParse + 8], bmsData.batteryTemp2);
+#else
+		convertTemperature((data[indexParse + 1] << 8) | data[indexParse + 2], bmsData.mosfetTemp);
+		convertTemperature((data[indexParse + 4] << 8) | data[indexParse + 5], bmsData.batteryTemp1);
+		convertTemperature((data[indexParse + 7] << 8) | data[indexParse + 8], bmsData.batteryTemp2);
+#endif
         bmsData.batteryVoltage = (data[indexParse + 10] << 8) | data[indexParse + 11];
         bmsData.batteryCurrent = (data[indexParse + 13] << 8) | data[indexParse + 14];
         bmsData.batterySOC = data[indexParse + 16];
+#ifdef LOG_OUT
 		/* Вывод в порт отладочной информации */
 		if (bmsSet.modeLog == ALL) {
 		    printlnMessage("   🔍 Расшифрованные данные:", "   🔍 Decrypted data:");
@@ -573,6 +666,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 				    printlnMessage("⏸ Ожидание", "⏸ Waiting");
 			        }
 		}
+#endif
 	}	
 	
 	/* Парсинг регистра 0x8B */
@@ -593,6 +687,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 		bmsProtection.cellUndervoltage = bmsProtection.protectionFlagsDetailed & (1 << 11);
 		bmsProtection.protection309A = bmsProtection.protectionFlagsDetailed & (1 << 12);
 		bmsProtection.protection309B = bmsProtection.protectionFlagsDetailed & (1 << 13);
+#ifdef LOG_OUT
 #ifndef DISABLE_OUTPUT_LOG_OX8B
 		/* Вывод в порт отладочной информации */
 		if (bmsSet.modeLog == ALL) {
@@ -611,6 +706,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 			}
 #endif
 #endif
+#endif
     }
 
 	/* Парсинг регистра 0x8С */
@@ -620,6 +716,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 		bmsStatus.dischargeMOSFETState = bmsStatus.statusFlagsDetailed & (1 << 1);
 		bmsStatus.balancerState = bmsStatus.statusFlagsDetailed & (1 << 2);
 		bmsStatus.batteryState = bmsStatus.statusFlagsDetailed & (1 << 3);	
+#ifdef LOG_OUT
 #ifndef DISABLE_OUTPUT_LOG_OX8C
 		/* Вывод в порт отладочной информации */
 		if (bmsSet.modeLog == ALL) {
@@ -644,6 +741,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 				);
 			}
 		}
+#endif
 #endif		
     }
 
@@ -651,6 +749,7 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 	if (data[indexParse + 81] == 0x9D) {bmsData.statusBalancer = data[indexParse + 82];}
 	if (data[indexParse + 123] == 0xAB) {bmsData.statusChargMosfet = data[indexParse + 124];}
 	if (data[indexParse + 125] == 0xAB) {bmsData.statusDischargeMosfet = data[indexParse + 126];}
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
 		printlnMessage("   🔍 Статус ручного управления BMS:", "   🔍 BMS Manual Control Status:");
 
@@ -672,15 +771,17 @@ static bms_error_t bmsParseAllData(uint8_t *data) {
 			);
 		}
 	}
+#endif
 	/* Выводим сообщение в лог об успешном парсинге пакета и выходим */
 	bmsData.countParsePacket++; // Увеличиваем счетчик успешно разобранных пакетов
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
 		printMessage("📨 Количество пакетов: ", "📨 Number of packages: "); Serial.println(bmsData.countParsePacket);
 		printMessage("❗ Количество ошибок: ", "❗ Number of errors: "); Serial.println(bmsData.countError);
 	}
 	Serial.print("✅ ");Serial.print(bmsData.countParsePacket);
 	printlnMessage("-й пакет успешно разобран!", "-th package successfully disassembled!");
-	Serial.println("");
+#endif
     return SUCCESS;
 }
 
@@ -755,31 +856,39 @@ static bms_error_t checkAnswer(uint8_t *dataAnswer, uint16_t length) {
 
 	/* Проверяем заголовок принятого пакета */
     if (dataAnswer[0] != 0x4E || dataAnswer[1] != 0x57) {
+#ifdef LOG_OUT
 		if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
             printlnMessage("❌ Неверный заголовок пакета!", "❌ Incorrect packet header!");
 		}
+#endif
 		clearRxBuffer();
         return ERROR_DATA;
 	}
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
 		printMessage("✅ Заголовок пакета корректный! = ", "✅ The packet header is correct! = ");
 		Serial.print("0x");
 		Serial.print(dataAnswer[0], HEX); Serial.println(dataAnswer[1], HEX);
 	}
+#endif
 
 	/* Проверка длины пакета */
     packetLength = (dataAnswer[2] << 8) | dataAnswer[3]; // длина пакета из принятого ответа
 	if (packetLength != indexAnswer - 2) {
+#ifdef LOG_OUT
 	    if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 		    printlnMessage("❌ Ошибка: некорректная длина пакета!", "❌ Error: Incorrect packet length!");
 		}
+#endif
         return ERROR_DATA;
 	}
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
 		printMessage("✅ Длина пакета корректна! = ", "✅ Packet length is correct! = ");
 		Serial.println(packetLength);
 	}
-	
+#endif
+
     /* Проверяем номер запрос-ответ (6, 7, 8, 9 байты с конца) */
     bmsData.answerNumber = (dataAnswer[length - 9] << 24) |
                    (dataAnswer[length - 8] << 16) |
@@ -788,6 +897,7 @@ static bms_error_t checkAnswer(uint8_t *dataAnswer, uint16_t length) {
     bmsData.answerNumber &= 0x00FFFFFF; // Принудительно обнуляем старший байт (делаем его = 0x00)
     /* Сравниваем с отправленным requestNumber */
     if (bmsData.answerNumber != bmsData.requestNumber) {
+#ifdef LOG_OUT
 		if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 			Serial.println("");
 			printMessage("📩 Получен answerNumber: ", "📩 Received answerNumber: ");
@@ -796,28 +906,35 @@ static bms_error_t checkAnswer(uint8_t *dataAnswer, uint16_t length) {
             Serial.printf("%06X\n", bmsData.requestNumber);
             printlnMessage("❌ Ошибка: номер запрос-ответ не совпадает!", "❌ Error: request-response number does not match!");
 		}
+#endif		
         return ERROR_DATA; // Выход из функции из-за несовпадения номеров запроса-ответа
     }
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
         printMessage("✅ Номера запроса и ответа совпадают! = ", "✅ Request and response numbers match! = ");
 		Serial.print("0x");
 		Serial.printf("%06X\n", bmsData.answerNumber);
 	}
-	
+#endif
+
 	/* Проверка контрольной суммы принятого пакета */
     uint16_t receivedChecksum = (dataAnswer[length - 2] << 8) | dataAnswer[length - 1]; // Контрольная сумма из принятого пакета
     calculateChecksum16(dataAnswer, length - 2);
     if (receivedChecksum != calculatedChecksum) {
+#ifdef LOG_OUT
 		if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
 		    printlnMessage("❌ Ошибка контрольной суммы!", "❌ Checksum error!");
 		}
+#endif
         return ERROR_DATA; // Выход из функции по несовпадению контрольной суммы пакета
     }
+#ifdef LOG_OUT
 	if (bmsSet.modeLog == ALL) {
 		printMessage("✅ Контрольная сумма совпадает! = ", "✅ Checksum matches! = ");
 		Serial.print("0x");
 		Serial.println(calculatedChecksum, HEX);
 	}
+#endif
     return SUCCESS; // Выход из функции в случае успеха
 }
 
@@ -855,6 +972,7 @@ static bms_error_t calculateChecksum16(uint8_t *data, uint16_t length) {
 *
 * @return bms_error_t
 */
+#ifdef LOG_OUT
 static bms_error_t printHexAnswer(uint8_t *dataPacket, uint16_t length) {
 	if (!dataPacket) {
         printErrorPointer();
@@ -875,6 +993,7 @@ static bms_error_t printHexAnswer(uint8_t *dataPacket, uint16_t length) {
     }
 	return SUCCESS;
 }
+#endif
 
 /*
 * @brief Функция расчета размера принимаемого пакета
@@ -920,6 +1039,7 @@ static bms_error_t resetAnswerArray(uint8_t *dataAnswer, uint16_t length) {
 *
 * @return void
 */
+#ifdef LOG_OUT
 static void printMessage(const char* messageRU, const char* messageEN) {
     if (bmsSet.language == EN) {
         Serial.print(F(messageEN));
@@ -928,6 +1048,7 @@ static void printMessage(const char* messageRU, const char* messageEN) {
     }
 	return;
 }
+#endif
 
 /*
 * @brief Функция вывода сообщения аналог Serial.println(F())
@@ -940,6 +1061,7 @@ static void printMessage(const char* messageRU, const char* messageEN) {
 *
 * @return void
 */
+#ifdef LOG_OUT
 static void printlnMessage(const char* messageRU, const char* messageEN) {
     if (bmsSet.language == EN) {
         Serial.println(F(messageEN));
@@ -948,6 +1070,7 @@ static void printlnMessage(const char* messageRU, const char* messageEN) {
     }
 	return;
 }
+#endif
 
 /*
 * @brief Функция вывода сообщения ошибки
@@ -958,7 +1081,9 @@ static void printlnMessage(const char* messageRU, const char* messageEN) {
 * @return void
 */
 static void printErrorPointer() {
+#ifdef LOG_OUT
 	printlnMessage("❌ Ошибка: Неверный указатель на данные!", "❌ Error: Invalid message pointer!");
+#endif
 	return;
 }
 
@@ -972,6 +1097,7 @@ static void printErrorPointer() {
 * @return void
 */
 static void logTimeoutErrorNoConnection() {
+#ifdef LOG_OUT
 	/* Выводим сообщение в лог */
     if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
         printlnMessage("⏰ Ошибка: Таймаут при получении ответа!", "⏰ Error: Timeout while receiving response!");
@@ -982,6 +1108,7 @@ static void logTimeoutErrorNoConnection() {
 	if (indexAnswer == 0) {
 		printlnMessage("🔴 Отсутсвует связь с BMS!", "🔴 No connection with BMS!");
 	}
+#endif
 	return;
 }
 
@@ -998,7 +1125,8 @@ static bms_error_t logErrorPacket(uint8_t *dataAnswer, uint16_t length) {
         printErrorPointer();
         return ERROR_POINTER;
     }
-	if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
+#ifdef LOG_OUT
+	if (bmsSet.modeLog == ALL) {
 		printHexAnswer(dataAnswer, length);
 	}
 	if (bmsSet.modeLog == ALL || bmsSet.modeLog == ERROR) {
@@ -1006,5 +1134,6 @@ static bms_error_t logErrorPacket(uint8_t *dataAnswer, uint16_t length) {
 		printMessage("🔹 Было получено байт: ", "🔹 Was received byte: ");
 		Serial.println(length);
 	}
+#endif
 	return SUCCESS;
 }
