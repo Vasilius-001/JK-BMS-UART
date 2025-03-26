@@ -41,16 +41,20 @@
 #include <Arduino.h>
 #include <JkBmsUart.h>
 
-BMSConfig bmsSet;
-
 void setup() {
-    Serial.begin(115200);
-    bmsSet.uart.begin(115200, SERIAL_8N1, 16, 17); // Инициализация UART
+   Serial.begin(bmsSet.speedUartLoger); // Аппаратный UART для информационных сообщений
+	bmsSet.uart.begin(bmsSet.speedUartBms); // Аппаратный UART для общения с BMS
 }
 
 void loop() {
-    bmsSendRecive(readAll); // Запрос всех регистров
-    delay(1000);
+   bmsSendRecive(readAll); // Запрос всех регистров
+   Serial.print("Напряжение батареи: ");
+   Serial.println(bmsData.batteryVoltage);
+   Serial.print("Ток батареи: ");
+   Serial.println(bmsData.batteryCurrent);
+   Serial.print("Состояние заряда: ");
+   Serial.println(bmsData.batterySOC);
+   delay(1000);
 }
 ```
 
